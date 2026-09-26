@@ -1,0 +1,37 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Local configuration
+local.properties
+
+# Local Java/JDK/Gradle installations
+jdk17/
+gradle-*
+*.tar.gz
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Android Studio
+.externalNativeBuild/
+.cxx/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# APKs
+*.apk
+*.aab
+
+# Signing keys
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
