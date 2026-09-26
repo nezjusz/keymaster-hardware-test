@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="verdict_pass_container">#C8E6C9</color>
+    <color name="verdict_on_pass_container">#0B3D1E</color>
+    <color name="verdict_fail_container">#FFDAD6</color>
+    <color name="verdict_on_fail_container">#410002</color>
+    <color name="details_surface">#F2F2F6</color>
+    <color name="caveat_text">#5A5C60</color>
+    <color name="indicator_primary">#6750A4</color>
+    <color name="indicator_secondary">#625B71</color>
+    <color name="indicator_tertiary">#7D5260</color>
+</resources>

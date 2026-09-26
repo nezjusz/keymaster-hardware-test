@@ -3,14 +3,18 @@ plugins {
 }
 
 android {
-    namespace 'com.example.keymastertest'
+    namespace 'io.github.nezjusz.keymastertest'
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.example.keymastertest'
+        applicationId 'io.github.nezjusz.keymastertest'
         minSdk 23
         targetSdk 29
-        versionCode 2
-        versionName '1.0.1'
+        versionCode 3
+        versionName '1.0.3'
     }
+}
+
+dependencies {
+    implementation 'com.google.android.material:material:1.14.0'
 }
