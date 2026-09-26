@@ -7,6 +7,10 @@ The app generates an RSA 2048-bit key in `AndroidKeyStore`, signs and verifies a
 it, then reports a verdict. The test key is deleted when the test finishes, so no key material
 is left on the device.
 
+| Result | Details |
+| --- | --- |
+| ![Result tab](screenshots/result.png) | ![Details tab](screenshots/details.png) |
+
 ## Output
 
 | Verdict | Meaning |
