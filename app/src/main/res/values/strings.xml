@@ -11,5 +11,6 @@
     <string name="verdict_software">Keystore reports software keys</string>
     <string name="verdict_malfunctioning">Keystore malfunctioning</string>
     <string name="verdict_failed">Test failed</string>
+    <string name="verdict_unknown">Backing could not be determined</string>
     <string name="caveat">A green verdict only means the Keystore works and reports hardware backing. It does not verify that this device is properly provisioned. A device with a blank or broken keybox passes this test. Only key attestation can prove the device\'s Root of Trust.</string>
 </resources>

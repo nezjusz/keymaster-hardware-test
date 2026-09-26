@@ -4,6 +4,8 @@
     <color name="verdict_on_pass_container">#0B3D1E</color>
     <color name="verdict_fail_container">#FFDAD6</color>
     <color name="verdict_on_fail_container">#410002</color>
+    <color name="verdict_unknown_container">#FFDEA3</color>
+    <color name="verdict_on_unknown_container">#2A1800</color>
     <color name="details_surface">#F2F2F6</color>
     <color name="caveat_text">#5A5C60</color>
     <color name="indicator_primary">#6750A4</color>

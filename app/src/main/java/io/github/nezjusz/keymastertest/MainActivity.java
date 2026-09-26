@@ -36,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String ALIAS = "KeymasterTestKey";
     private static final String ANDROID_KEY_STORE = "AndroidKeyStore";
+    private static final int KEY_SIZE_BITS = 2048;
     private static final String[] SIGNATURE_ALGORITHMS = {
             "SHA256withRSA",
             "SHA256withRSAandMGF1",
@@ -108,8 +109,8 @@ public class MainActivity extends AppCompatActivity {
         try {
             result = probe();
         } catch (Exception e) {
-            result = new Result(R.string.verdict_failed, R.drawable.ic_verdict_fail,
-                    false, describe(e), null);
+            result = new Result(R.string.verdict_failed, Outcome.FAIL,
+                    R.drawable.ic_verdict_fail, describe(e), null);
         }
 
         if (destroyed) {
@@ -120,14 +121,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void render(Result result) {
-        int container = ContextCompat.getColor(this, result.pass
-                ? R.color.verdict_pass_container
-                : R.color.verdict_fail_container);
-        int onContainer = ContextCompat.getColor(this, result.pass
-                ? R.color.verdict_on_pass_container
-                : R.color.verdict_on_fail_container);
+        int containerRes;
+        int onContainerRes;
+        switch (result.outcome) {
+            case PASS:
+                containerRes = R.color.verdict_pass_container;
+                onContainerRes = R.color.verdict_on_pass_container;
+                break;
+            case UNKNOWN:
+                containerRes = R.color.verdict_unknown_container;
+                onContainerRes = R.color.verdict_on_unknown_container;
+                break;
+            default:
+                containerRes = R.color.verdict_fail_container;
+                onContainerRes = R.color.verdict_on_fail_container;
+                break;
+        }
 
-        verdictCard.setCardBackgroundColor(container);
+        verdictCard.setCardBackgroundColor(ContextCompat.getColor(this, containerRes));
+        int onContainer = ContextCompat.getColor(this, onContainerRes);
         verdictIcon.setImageResource(result.icon);
         verdictIcon.setColorFilter(onContainer);
         verdictView.setTextColor(onContainer);
@@ -155,7 +167,7 @@ public class MainActivity extends AppCompatActivity {
         }
         return cleanupFailure == null
                 ? result
-                : new Result(result.verdictRes, result.icon, result.pass,
+                : new Result(result.verdictRes, result.outcome, result.icon,
                         result.details + "\n\n" + cleanupFailure, result.technical);
     }
 
@@ -169,6 +181,7 @@ public class MainActivity extends AppCompatActivity {
                 .setSignaturePaddings(
                         KeyProperties.SIGNATURE_PADDING_RSA_PKCS1,
                         KeyProperties.SIGNATURE_PADDING_RSA_PSS)
+                .setKeySize(KEY_SIZE_BITS)
                 .build());
 
         KeyPair pair = generator.generateKeyPair();
@@ -186,38 +199,59 @@ public class MainActivity extends AppCompatActivity {
             roundTrip = "FAIL - " + describe(e);
         }
 
-        boolean hardwareBacked = isHardwareBacked(info);
-        boolean insideSecureHardware = isInsideSecureHardware(info);
+        Backing backing = detectBacking(info);
 
         int verdictRes;
-        boolean pass;
+        Outcome outcome;
         if (!roundTripOk) {
             verdictRes = R.string.verdict_malfunctioning;
-            pass = false;
-        } else if (hardwareBacked) {
+            outcome = Outcome.FAIL;
+        } else if (backing == Backing.HARDWARE) {
             verdictRes = R.string.verdict_pass;
-            pass = true;
-        } else {
+            outcome = Outcome.PASS;
+        } else if (backing == Backing.SOFTWARE) {
             verdictRes = R.string.verdict_software;
-            pass = false;
+            outcome = Outcome.FAIL;
+        } else {
+            verdictRes = R.string.verdict_unknown;
+            outcome = Outcome.UNKNOWN;
+        }
+
+        @DrawableRes int icon;
+        switch (outcome) {
+            case PASS:
+                icon = R.drawable.ic_verdict_pass;
+                break;
+            case UNKNOWN:
+                icon = R.drawable.ic_verdict_unknown;
+                break;
+            default:
+                icon = R.drawable.ic_verdict_fail;
+                break;
         }
 
         StringBuilder details = new StringBuilder();
         details.append("Sign/verify round trip: ").append(roundTrip).append('\n');
         details.append("Security level: ").append(securityLevel(info)).append('\n');
-        details.append("Inside secure hardware: ").append(insideSecureHardware).append('\n');
+        details.append("Inside secure hardware: ")
+                .append(insideSecureHardwareText(info)).append('\n');
         details.append("Origin: ").append(originName(info.getOrigin())).append('\n');
         details.append("Key size: ").append(info.getKeySize()).append(" bits\n");
         details.append("Android: ").append(Build.VERSION.RELEASE)
                 .append(" (API ").append(Build.VERSION.SDK_INT).append(')');
 
-        if (hardwareBacked && !insideSecureHardware) {
-            details.append("\n\nNote: isInsideSecureHardware() is deprecated and known to report")
-                    .append(" false on some builds. The security level above is the better signal.");
+        if (backing == Backing.SOFTWARE && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            details.append("\n\nNote: on Android 11 and older this verdict rests on")
+                    .append(" isInsideSecureHardware(), which is deprecated and known to")
+                    .append(" report false on some builds that do have a Trusted Environment.")
+                    .append(" Android 12+ uses getSecurityLevel() instead.");
+        } else if (backing == Backing.UNKNOWN) {
+            details.append("\n\nNote: the Keystore did not report a usable backing value.")
+                    .append(" This is not the same as a software-backed Keystore, and it may")
+                    .append(" indicate a malfunctioning secure element.");
         }
 
-        return new Result(verdictRes, pass ? R.drawable.ic_verdict_pass : R.drawable.ic_verdict_fail,
-                pass, details.toString(), platformContext(info));
+        return new Result(verdictRes, outcome, icon, details.toString(), platformContext(info));
     }
 
     private static String signAndVerify(KeyPair pair) throws Exception {
@@ -255,26 +289,47 @@ public class MainActivity extends AppCompatActivity {
         return verifier.verify(signature);
     }
 
-    private static boolean isHardwareBacked(KeyInfo info) {
+    /**
+     * Reads the Keystore's backing. A failure to read is reported as UNKNOWN rather than
+     * folded into SOFTWARE, because "could not tell" and "not hardware backed" are different
+     * diagnoses and conflating them would misdirect someone debugging a broken secure element.
+     */
+    private static Backing detectBacking(KeyInfo info) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                int level = info.getSecurityLevel();
-                return level == KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT
-                        || level == KeyProperties.SECURITY_LEVEL_STRONGBOX;
+                switch (info.getSecurityLevel()) {
+                    case KeyProperties.SECURITY_LEVEL_STRONGBOX:
+                    case KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT:
+                        return Backing.HARDWARE;
+                    case KeyProperties.SECURITY_LEVEL_SOFTWARE:
+                        return Backing.SOFTWARE;
+                    default:
+                        return Backing.UNKNOWN;
+                }
             }
-            return isInsideSecureHardware(info);
+            Boolean inside = isInsideSecureHardware(info);
+            if (inside == null) {
+                return Backing.UNKNOWN;
+            }
+            return inside ? Backing.HARDWARE : Backing.SOFTWARE;
         } catch (Exception e) {
-            return false;
+            return Backing.UNKNOWN;
         }
     }
 
+    /** @return true, false, or null if the call itself failed. */
     @SuppressWarnings("deprecation")
-    private static boolean isInsideSecureHardware(KeyInfo info) {
+    private static Boolean isInsideSecureHardware(KeyInfo info) {
         try {
             return info.isInsideSecureHardware();
         } catch (Exception e) {
-            return false;
+            return null;
         }
+    }
+
+    private static String insideSecureHardwareText(KeyInfo info) {
+        Boolean inside = isInsideSecureHardware(info);
+        return inside == null ? "unavailable" : inside.toString();
     }
 
     private static String securityLevel(KeyInfo info) {
@@ -288,12 +343,16 @@ public class MainActivity extends AppCompatActivity {
                     case KeyProperties.SECURITY_LEVEL_SOFTWARE:
                         return "Software";
                     default:
-                        return "Unknown";
+                        return "Undetermined";
                 }
             }
-            return isInsideSecureHardware(info) ? "Hardware (reported)" : "Software (reported)";
+            Boolean inside = isInsideSecureHardware(info);
+            if (inside == null) {
+                return "Undetermined";
+            }
+            return inside ? "Hardware (reported)" : "Software (reported)";
         } catch (Exception e) {
-            return "Unavailable";
+            return "Undetermined";
         }
     }
 
@@ -398,20 +457,32 @@ public class MainActivity extends AppCompatActivity {
         return sb.toString();
     }
 
+    private enum Backing {
+        HARDWARE,
+        SOFTWARE,
+        UNKNOWN
+    }
+
+    private enum Outcome {
+        PASS,
+        UNKNOWN,
+        FAIL
+    }
+
     private static final class Result {
         @StringRes
         final int verdictRes;
+        final Outcome outcome;
         @DrawableRes
         final int icon;
-        final boolean pass;
         final String details;
         final String technical;
 
-        Result(@StringRes int verdictRes, @DrawableRes int icon, boolean pass,
+        Result(@StringRes int verdictRes, Outcome outcome, @DrawableRes int icon,
                 String details, String technical) {
             this.verdictRes = verdictRes;
+            this.outcome = outcome;
             this.icon = icon;
-            this.pass = pass;
             this.details = details;
             this.technical = technical;
         }
