@@ -1,15 +1,16 @@
 # Gradle
 .gradle/
 build/
-**/build/
+
+# JVM crash logs
+hs_err_pid*.log
+replay_pid*.log
 
 # Local configuration
 local.properties
 
-# Local Java/JDK/Gradle installations
-jdk17/
-gradle-*
-*.tar.gz
+# Local Gradle installations
+/gradle-*
 
 # IDE
 .idea/
