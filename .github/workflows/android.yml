@@ -124,6 +124,13 @@ jobs:
     permissions:
       contents: write
     steps:
+      # gh shells out to git to work out which repository it is publishing to, and
+      # --generate-notes needs history to diff against the previous release, so this job needs a
+      # full checkout even though it downloads the APK rather than building it.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download the APK built by the build job
         uses: actions/download-artifact@v4
         with:
