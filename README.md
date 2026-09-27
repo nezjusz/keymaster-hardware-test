@@ -1,7 +1,7 @@
 # Keymaster Hardware Test
 
 A small Android diagnostic app for checking whether Android Keystore is using hardware-backed
-secure storage. It requests no permissions.
+secure storage.
 
 The app generates an RSA 2048-bit key in `AndroidKeyStore`, signs and verifies a payload with
 it, then reports a verdict. It then runs a **key attestation** probe and reports the device
@@ -9,13 +9,9 @@ security signals it can actually observe. The test keys are deleted when each pr
 no key material is left on the device. It requests no permissions, collects nothing, and sends
 nothing anywhere.
 
-| Result | Details |
-| --- | --- |
-| ![Result tab](screenshots/result.png) | ![Details tab](screenshots/details.png) |
-
-The Result tab also carries a **Device security** card, which is the part that matters:
-
-![Device security](screenshots/security.png)
+| Result | Device security | Details |
+| --- | --- | --- |
+| ![Result tab](screenshots/result.png) | ![Device security card](screenshots/security.png) | ![Details tab](screenshots/details.png) |
 
 ## Output
 
