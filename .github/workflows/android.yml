@@ -32,8 +32,24 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # android-actions/setup-android is deliberately not used: v3 tries to install the legacy
+      # "tools" package, which no longer exists, and fails the job. The hosted runner already
+      # ships a full SDK, so this only makes sure the exact components this project needs are
+      # present. sdkmanager is a no-op for anything already installed.
+      - name: Ensure the Android SDK components are installed
+        run: |
+          set -euo pipefail
+          sdkmanager="$(command -v sdkmanager || true)"
+          if [ -z "$sdkmanager" ]; then
+            sdkmanager="$(ls -d "${ANDROID_HOME:-$HOME/Android/Sdk}"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | tail -1 || true)"
+          fi
+          if [ -z "$sdkmanager" ]; then
+            echo "Could not locate sdkmanager; ANDROID_HOME=${ANDROID_HOME:-unset}" >&2
+            exit 1
+          fi
+          echo "Using $sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$sdkmanager" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Make the wrapper executable
         run: chmod +x gradlew
