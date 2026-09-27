@@ -23,8 +23,6 @@ jobs:
   build:
     name: Build and verify
     runs-on: ubuntu-latest
-    outputs:
-      apk: ${{ steps.apk.outputs.path }}
     steps:
       - uses: actions/checkout@v4
 
@@ -83,7 +81,6 @@ jobs:
       # increasing code without anyone having to remember to bump it.
       - name: Build the requested version
         if: github.event_name == 'workflow_dispatch'
-        id: apk
         env:
           VERSION: ${{ inputs.version }}
           VERSION_CODE: ${{ github.run_number }}
@@ -92,9 +89,19 @@ jobs:
             "-PreleaseVersionName=$VERSION" \
             "-PreleaseVersionCode=$VERSION_CODE" \
             test lint assembleDebug
-          app_path="$(find app/build/outputs/apk -name '*.apk' -type f | head -1)"
-          echo "Built $app_path"
-          echo "path=$app_path" >> "$GITHUB_OUTPUT"
+
+      # Gradle always emits app-debug.apk. Rename it to the release name here so the file is
+      # correct both in the run's artifacts and on the releases page.
+      - name: Give the APK its release name
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          built="app/build/outputs/apk/debug/app-debug.apk"
+          release_name="app/build/outputs/apk/debug/keymaster-hardware-test_v$VERSION.apk"
+          mv "$built" "$release_name"
+          echo "Named $release_name"
 
       - name: Upload test and lint reports
         if: always()
@@ -112,7 +119,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: keymaster-hardware-test-${{ inputs.version }}
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/keymaster-hardware-test_*.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -148,4 +155,4 @@ jobs:
           gh release create "v$VERSION" \
             --title "v$VERSION" \
             --generate-notes \
-            apk/app-debug.apk
+            "apk/keymaster-hardware-test_v$VERSION.apk"

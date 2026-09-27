@@ -25,8 +25,9 @@ Releases are only ever published by hand. Go to the Actions tab, choose **Androi
 That run:
 
 - builds and tests the same way a push does, but stamps the version you typed onto the APK
-- attaches the APK to the run's summary page
-- creates a GitHub release tagged `v1.2.0` with the APK attached and generated release notes
+- renames the APK to `keymaster-hardware-test_v<version>.apk`, so it is readable both in the run's
+  artifacts and on the releases page
+- creates a GitHub release tagged `v<version>` with that APK attached and generated release notes
 
 `versionName` comes from your input, so you never have to edit `app/build.gradle` to publish.
 `versionCode` is the workflow run number, which keeps every published APK unique and increasing
