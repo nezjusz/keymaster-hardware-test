@@ -13,25 +13,35 @@ seconds. If security software blocks the Gradle daemon, add `--no-daemon`.
 
 ## Continuous integration
 
-`.github/workflows/android.yml` runs on every push to `main`, on every pull request, and on demand
-from the Actions tab. It runs the unit tests, lint, and assembly, and the job only goes green if
-all three pass, so a broken build cannot produce a published APK.
-
-Every run uploads the debug APK as a workflow artifact named
-`keymaster-hardware-test-<commit>`, downloadable from the run's summary page for 30 days.
+`.github/workflows/android.yml` runs on every push to `main` and on every pull request. Those runs
+**only verify**: they run the unit tests, lint, and assembly against the repository exactly as it
+stands, and publish nothing. If any of the three fails the run goes red, and no APK is produced.
 
 ## Cutting a release
 
-Push a `v`-prefixed tag and the same workflow attaches the APK to a GitHub release:
+Releases are only ever published by hand. Go to the Actions tab, choose **Android CI**, click
+**Run workflow**, and type the version you want, for example `1.2.0`.
+
+That run:
+
+- builds and tests the same way a push does, but stamps the version you typed onto the APK
+- attaches the APK to the run's summary page
+- creates a GitHub release tagged `v1.2.0` with the APK attached and generated release notes
+
+`versionName` comes from your input, so you never have to edit `app/build.gradle` to publish.
+`versionCode` is the workflow run number, which keeps every published APK unique and increasing
+without anyone having to remember to bump it.
+
+The version is checked before use: only plain dotted numbers are accepted, so a stray `v` prefix,
+a pre-release suffix, or anything containing a slash is rejected instead of becoming a broken tag.
+Re-running a workflow for a version that already has a release fails deliberately, because
+republishing a version should be an explicit decision.
+
+To build a specific version locally, override it on the command line:
 
 ```sh
-git tag v1.1.0
-git push origin v1.1.0
+./gradlew assembleDebug -PreleaseVersionName=1.2.0 -PreleaseVersionCode=42
 ```
-
-The release job refuses to publish if the tag does not match `versionName` in `app/build.gradle`,
-which catches the common mistake of tagging a version you forgot to bump. Release notes are
-generated from the commits.
 
 The published APK is the debug build, so it is signed with the debug keystore and installs with
 `adb install`. Signing a release build would mean committing a keystore or wiring one in as a

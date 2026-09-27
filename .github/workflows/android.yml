@@ -3,23 +3,28 @@ name: Android CI
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build and publish, for example 1.2.0'
+        required: true
+        type: string
 
-# Only the tag job needs write access; everything else just reads.
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
 
 jobs:
   build:
-    name: Build, test and lint
+    name: Build and verify
     runs-on: ubuntu-latest
+    outputs:
+      apk: ${{ steps.apk.outputs.path }}
     steps:
       - uses: actions/checkout@v4
 
@@ -54,10 +59,42 @@ jobs:
       - name: Make the wrapper executable
         run: chmod +x gradlew
 
-      # This is the gate. Unit tests, lint, and assembly all have to pass for the job to go
-      # green, so a broken build can never produce a published APK.
-      - name: Run unit tests, lint and assemble
+      # Guards the version before it reaches the tag, so a typo cannot create a broken release.
+      - name: Reject a version that cannot become a tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+(\.[0-9]+){1,3}$'; then
+            echo "Version '$VERSION' is not a plain version such as 1.2.0" >&2
+            exit 1
+          fi
+          echo "Publishing version $VERSION"
+
+      # Verification only. This compiles the repository exactly as it stands and runs the unit
+      # tests and lint. Nothing is produced for download, so a broken commit yields a red check
+      # and no APK at all.
+      - name: Verify the repository as it stands
+        if: github.event_name != 'workflow_dispatch'
         run: ./gradlew --stacktrace test lint assembleDebug
+
+      # A manual run runs the same checks, but stamps the requested version onto the APK.
+      # versionCode is the workflow run number so every published build gets a unique,
+      # increasing code without anyone having to remember to bump it.
+      - name: Build the requested version
+        if: github.event_name == 'workflow_dispatch'
+        id: apk
+        env:
+          VERSION: ${{ inputs.version }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          ./gradlew --stacktrace \
+            "-PreleaseVersionName=$VERSION" \
+            "-PreleaseVersionCode=$VERSION_CODE" \
+            test lint assembleDebug
+          app_path="$(find app/build/outputs/apk -name '*.apk' -type f | head -1)"
+          echo "Built $app_path"
+          echo "path=$app_path" >> "$GITHUB_OUTPUT"
 
       - name: Upload test and lint reports
         if: always()
@@ -70,44 +107,38 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Upload the debug APK
+      - name: Attach the APK to the run
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: keymaster-hardware-test-${{ github.sha }}
+          name: keymaster-hardware-test-${{ inputs.version }}
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
 
-  release:
-    name: Publish GitHub release
+  publish:
+    name: Publish release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-
-      # Catches tagging the wrong version, which is easy to do and annoying to discover later.
-      - name: Verify the tag matches versionName
-        run: |
-          tag_version="${GITHUB_REF_NAME#v}"
-          gradle_version="$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)"
-          if [ "$tag_version" != "$gradle_version" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match versionName $gradle_version" >&2
-            exit 1
-          fi
-          echo "Tag $GITHUB_REF_NAME matches versionName $gradle_version"
-
       - name: Download the APK built by the build job
         uses: actions/download-artifact@v4
         with:
-          name: keymaster-hardware-test-${{ github.sha }}
+          name: keymaster-hardware-test-${{ inputs.version }}
           path: apk
 
-      - name: Attach the APK to the release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: apk/app-debug.apk
-          generate_release_notes: true
-          fail_on_unmatched_files: true
+      # gh ships on the hosted runner, so this avoids depending on a third-party release action.
+      # It fails if the tag already exists, which is deliberate: republishing a version should
+      # be an explicit decision, not a side effect of re-running a workflow.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --generate-notes \
+            apk/app-debug.apk

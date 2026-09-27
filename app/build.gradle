@@ -2,6 +2,12 @@ plugins {
     id 'com.android.application'
 }
 
+// A release build overrides these on the command line, e.g.
+// ./gradlew assembleDebug -PreleaseVersionName=1.2.0 -PreleaseVersionCode=42
+// Local builds fall back to the versions checked in below.
+def releaseVersionName = project.findProperty('releaseVersionName')?.toString()
+def releaseVersionCode = project.findProperty('releaseVersionCode')?.toString()
+
 android {
     namespace 'io.github.nezjusz.keymastertest'
     compileSdk 35
@@ -10,8 +16,8 @@ android {
         applicationId 'io.github.nezjusz.keymastertest'
         minSdk 23
         targetSdk 29
-        versionCode 5
-        versionName '1.1.0'
+        versionCode releaseVersionCode ? releaseVersionCode.toInteger() : 5
+        versionName releaseVersionName ?: '1.1.0'
     }
     lint {
         // targetSdk stays at 29 deliberately. Android 15 enforces edge-to-edge for apps
