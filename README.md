@@ -1,5 +1,7 @@
 # Keymaster Hardware Test
 
+[![Android CI](https://github.com/nezjusz/keymaster-hardware-test/actions/workflows/android.yml/badge.svg)](https://github.com/nezjusz/keymaster-hardware-test/actions/workflows/android.yml)
+
 A small Android diagnostic app for checking whether Android Keystore is using hardware-backed
 secure storage.
 

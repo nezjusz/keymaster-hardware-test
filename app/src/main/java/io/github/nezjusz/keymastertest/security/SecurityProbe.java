@@ -4,6 +4,8 @@ import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 
+import androidx.annotation.RequiresApi;
+
 import java.lang.reflect.Method;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
@@ -292,6 +294,7 @@ public final class SecurityProbe {
      *
      * @return the parsed attestation (null if the Keystore declined to attest) plus any caveat
      */
+    @RequiresApi(Build.VERSION_CODES.N)
     private static Attempt runAttestation() throws Exception {
         byte[] challenge = new byte[32];
         new SecureRandom().nextBytes(challenge);
@@ -328,6 +331,7 @@ public final class SecurityProbe {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     private static Attestation attest(KeyStore keyStore, byte[] challenge, int purposes)
             throws Exception {
         KeyPairGenerator generator = KeyPairGenerator.getInstance(

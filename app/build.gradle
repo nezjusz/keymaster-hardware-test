@@ -13,6 +13,13 @@ android {
         versionCode 5
         versionName '1.1.0'
     }
+    lint {
+        // targetSdk stays at 29 deliberately. Android 15 enforces edge-to-edge for apps
+        // targeting API 35, and this UI has not been tested against that; raising it would
+        // change behaviour on modern devices for a sideloaded diagnostic tool.
+        disable 'ExpiredTargetSdkVersion'
+        abortOnError true
+    }
 }
 
 dependencies {

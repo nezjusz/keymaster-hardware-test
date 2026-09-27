@@ -1,0 +1,97 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Only the tag job needs write access; everything else just reads.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, test and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make the wrapper executable
+        run: chmod +x gradlew
+
+      # This is the gate. Unit tests, lint, and assembly all have to pass for the job to go
+      # green, so a broken build can never produce a published APK.
+      - name: Run unit tests, lint and assemble
+        run: ./gradlew --stacktrace test lint assembleDebug
+
+      - name: Upload test and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload the debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: keymaster-hardware-test-${{ github.sha }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Catches tagging the wrong version, which is easy to do and annoying to discover later.
+      - name: Verify the tag matches versionName
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          gradle_version="$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)"
+          if [ "$tag_version" != "$gradle_version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match versionName $gradle_version" >&2
+            exit 1
+          fi
+          echo "Tag $GITHUB_REF_NAME matches versionName $gradle_version"
+
+      - name: Download the APK built by the build job
+        uses: actions/download-artifact@v4
+        with:
+          name: keymaster-hardware-test-${{ github.sha }}
+          path: apk
+
+      - name: Attach the APK to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apk/app-debug.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true
