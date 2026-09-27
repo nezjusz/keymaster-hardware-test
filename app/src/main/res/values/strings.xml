@@ -7,10 +7,19 @@
     <string name="testing">Running Keystore probe</string>
     <string name="details_measurements">Measurements</string>
     <string name="details_context">Platform context</string>
+    <string name="security_title">Device security</string>
+    <string name="security_subtitle">Signals the platform will disclose to an ordinary app</string>
+    <string name="trust_strong_headline">Signals are strong</string>
+    <string name="trust_partial_headline">Signals are incomplete</string>
+    <string name="trust_compromised_headline">Problems found</string>
+    <string name="trust_undetermined_headline">Not enough information</string>
+    <string name="trust_reasons_title">Why</string>
+    <string name="trust_more">Show full error</string>
+    <string name="trust_less">Hide full error</string>
     <string name="verdict_pass">Keystore reports hardware backing</string>
     <string name="verdict_software">Keystore reports software keys</string>
     <string name="verdict_malfunctioning">Keystore malfunctioning</string>
     <string name="verdict_failed">Test failed</string>
     <string name="verdict_unknown">Backing could not be determined</string>
-    <string name="caveat">A green verdict only means the Keystore works and reports hardware backing. It does not verify that this device is properly provisioned. A device with a blank or broken keybox passes this test. Only key attestation can prove the device\'s Root of Trust.</string>
+    <string name="caveat">A green verdict only means the Keystore works and reports hardware backing. It does not verify that this device is properly provisioned. A device with a blank or broken keybox passes the round trip but fails attestation, which is why the two are reported separately above.</string>
 </resources>

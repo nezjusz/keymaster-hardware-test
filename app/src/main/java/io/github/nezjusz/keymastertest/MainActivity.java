@@ -5,8 +5,10 @@ import android.os.Bundle;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyInfo;
 import android.security.keystore.KeyProperties;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.DrawableRes;
@@ -15,9 +17,13 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.color.DynamicColors;
 import com.google.android.material.loadingindicator.LoadingIndicator;
+
+import io.github.nezjusz.keymastertest.security.SecurityProbe;
+import io.github.nezjusz.keymastertest.security.SecurityReport;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -55,6 +61,15 @@ public class MainActivity extends AppCompatActivity {
     private TextView verdictView;
     private TextView detailsView;
     private TextView technicalView;
+    private MaterialCardView trustCard;
+    private TextView trustHeadline;
+    private TextView trustExplanation;
+    private TextView trustReasonsTitle;
+    private LinearLayout trustReasons;
+    private MaterialButton trustMore;
+    private TextView trustRaw;
+    private MaterialCardView securityCard;
+    private LinearLayout signalContainer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,6 +85,15 @@ public class MainActivity extends AppCompatActivity {
         verdictView = findViewById(R.id.verdict);
         detailsView = findViewById(R.id.details);
         technicalView = findViewById(R.id.technical);
+        trustCard = findViewById(R.id.trust_card);
+        trustHeadline = findViewById(R.id.trust_headline);
+        trustExplanation = findViewById(R.id.trust_explanation);
+        trustReasonsTitle = findViewById(R.id.trust_reasons_title);
+        trustReasons = findViewById(R.id.trust_reasons);
+        trustMore = findViewById(R.id.trust_more);
+        trustRaw = findViewById(R.id.trust_raw);
+        securityCard = findViewById(R.id.security_card);
+        signalContainer = findViewById(R.id.signal_container);
 
         LoadingIndicator loadingIndicator = findViewById(R.id.loading_indicator);
         loadingIndicator.setIndicatorColor(
@@ -106,18 +130,137 @@ public class MainActivity extends AppCompatActivity {
 
     private void runTest() {
         Result result;
+        SecurityReport security;
         try {
             result = probe();
         } catch (Exception e) {
             result = new Result(R.string.verdict_failed, Outcome.FAIL,
                     R.drawable.ic_verdict_fail, describe(e), null);
         }
+        try {
+            security = SecurityProbe.run(
+                    result.outcome == Outcome.PASS, result.verdictRes == R.string.verdict_unknown);
+        } catch (Throwable t) {
+            security = null;
+        }
 
         if (destroyed) {
             return;
         }
-        final Result rendered = result;
-        runOnUiThread(() -> render(rendered));
+        final Result renderedResult = result;
+        final SecurityReport renderedSecurity = security;
+        runOnUiThread(() -> {
+            render(renderedResult);
+            if (renderedSecurity != null) {
+                renderSecurity(renderedSecurity);
+            }
+        });
+    }
+
+    private void renderSecurity(SecurityReport report) {
+        int containerRes;
+        int onContainerRes;
+        int headlineRes;
+        switch (report.trust) {
+            case STRONG:
+                containerRes = R.color.verdict_pass_container;
+                onContainerRes = R.color.verdict_on_pass_container;
+                headlineRes = R.string.trust_strong_headline;
+                break;
+            case COMPROMISED:
+                containerRes = R.color.verdict_fail_container;
+                onContainerRes = R.color.verdict_on_fail_container;
+                headlineRes = R.string.trust_compromised_headline;
+                break;
+            default:
+                containerRes = R.color.verdict_unknown_container;
+                onContainerRes = R.color.verdict_on_unknown_container;
+                headlineRes = report.trust == SecurityReport.Trust.PARTIAL
+                        ? R.string.trust_partial_headline
+                        : R.string.trust_undetermined_headline;
+                break;
+        }
+
+        trustCard.setCardBackgroundColor(ContextCompat.getColor(this, containerRes));
+        int onContainer = ContextCompat.getColor(this, onContainerRes);
+        trustHeadline.setTextColor(onContainer);
+        trustExplanation.setTextColor(onContainer);
+        trustReasonsTitle.setTextColor(onContainer);
+        trustHeadline.setText(headlineRes);
+        trustExplanation.setText(report.trustExplanation);
+
+        trustReasons.removeAllViews();
+        LayoutInflater inflater = LayoutInflater.from(this);
+        if (report.trustReasons.isEmpty()) {
+            trustReasonsTitle.setVisibility(View.GONE);
+        } else {
+            trustReasonsTitle.setVisibility(View.VISIBLE);
+            for (String reason : report.trustReasons) {
+                TextView row = (TextView) inflater.inflate(
+                        android.R.layout.simple_list_item_1, trustReasons, false);
+                row.setText("•  " + reason);
+                row.setTextColor(onContainer);
+                row.setTextAppearance(this, androidx.appcompat.R.style.TextAppearance_AppCompat_Body1);
+                trustReasons.addView(row);
+            }
+        }
+
+        // The result card carries one short bullet per problem; the diagnosis and the raw
+        // exception chain stay hidden until someone asks for them.
+        trustRaw.setText(report.detail);
+        boolean hasDetail = report.detail != null && !report.detail.isEmpty();
+        trustMore.setVisibility(hasDetail ? View.VISIBLE : View.GONE);
+        trustMore.setText(R.string.trust_more);
+        trustMore.setIconResource(R.drawable.ic_expand_more);
+        trustRaw.setVisibility(View.GONE);
+        trustMore.setOnClickListener(v -> {
+            boolean expanding = trustRaw.getVisibility() != View.VISIBLE;
+            trustRaw.setVisibility(expanding ? View.VISIBLE : View.GONE);
+            trustMore.setText(expanding ? R.string.trust_less : R.string.trust_more);
+            trustMore.setIconResource(expanding
+                    ? R.drawable.ic_expand_less
+                    : R.drawable.ic_expand_more);
+        });
+
+        signalContainer.removeAllViews();
+        for (SecurityReport.Signal signal : report.signals) {
+            View row = inflater.inflate(R.layout.item_signal, signalContainer, false);
+            ImageView icon = row.findViewById(R.id.signal_icon);
+            TextView label = row.findViewById(R.id.signal_label);
+            TextView value = row.findViewById(R.id.signal_value);
+
+            int iconRes;
+            int valueColorRes;
+            switch (signal.status) {
+                case GOOD:
+                    iconRes = R.drawable.ic_verdict_pass;
+                    valueColorRes = R.color.verdict_on_pass_container;
+                    break;
+                case WARNING:
+                    iconRes = R.drawable.ic_verdict_unknown;
+                    valueColorRes = R.color.verdict_on_unknown_container;
+                    break;
+                case BAD:
+                    iconRes = R.drawable.ic_verdict_fail;
+                    valueColorRes = R.color.verdict_on_fail_container;
+                    break;
+                default:
+                    iconRes = R.drawable.ic_verdict_unknown;
+                    valueColorRes = R.color.signal_label;
+                    break;
+            }
+
+            int iconColor = ContextCompat.getColor(this, valueColorRes);
+            icon.setImageResource(iconRes);
+            icon.setColorFilter(iconColor);
+            label.setText(signal.label);
+            value.setText(signal.value);
+            value.setTextColor(iconColor);
+            signalContainer.addView(row);
+        }
+
+        trustCard.setVisibility(View.VISIBLE);
+        securityCard.setVisibility(View.VISIBLE);
     }
 
     private void render(Result result) {

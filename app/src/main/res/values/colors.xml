@@ -8,6 +8,7 @@
     <color name="verdict_on_unknown_container">#2A1800</color>
     <color name="details_surface">#F2F2F6</color>
     <color name="caveat_text">#5A5C60</color>
+    <color name="signal_label">#43474E</color>
     <color name="indicator_primary">#6750A4</color>
     <color name="indicator_secondary">#625B71</color>
     <color name="indicator_tertiary">#7D5260</color>
