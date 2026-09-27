@@ -15,6 +15,8 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.button.MaterialButton;
@@ -76,6 +78,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         DynamicColors.applyToActivityIfAvailable(this);
         setContentView(R.layout.activity_main);
+        applySystemBarAppearance();
 
         loading = findViewById(R.id.loading);
         resultTab = findViewById(R.id.result_tab);
@@ -119,6 +122,21 @@ public class MainActivity extends AppCompatActivity {
         boolean showResult = itemId == R.id.nav_result;
         resultTab.setVisibility(showResult ? View.VISIBLE : View.GONE);
         detailsTab.setVisibility(showResult ? View.GONE : View.VISIBLE);
+    }
+
+    /**
+     * Both system bars sit on the app's light surface, so their icons have to be dark to stay
+     * readable. The Material DayNight theme sets neither flag, and the insets controller only
+     * takes effect once the decor view is attached, so this runs after setContentView.
+     */
+    private void applySystemBarAppearance() {
+        int nightMask = getResources().getConfiguration().uiMode
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+        boolean light = nightMask != android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        WindowInsetsControllerCompat controller =
+                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        controller.setAppearanceLightStatusBars(light);
+        controller.setAppearanceLightNavigationBars(light);
     }
 
     @Override

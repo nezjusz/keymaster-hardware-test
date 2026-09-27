@@ -169,11 +169,12 @@
                             android:id="@+id/trust_raw"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:fontFamily="monospace"
                             android:lineSpacingMultiplier="1.3"
                             android:paddingBottom="4dp"
-                            android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorOnSurface"
                             android:textIsSelectable="true"
+                            android:textSize="12sp"
                             android:visibility="gone" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
